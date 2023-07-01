@@ -1,3 +1,4 @@
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar, Tuple, List, Optional
@@ -6,6 +7,7 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.widgets import Button, CheckButtons, AxesWidget, TextBox
+from tkinter import filedialog, messagebox
 
 
 @dataclass
@@ -50,6 +52,14 @@ class ISystem(ABC):
     def get_next(self) -> Optional[Self]:
         """ Retrieves the next state of the system """
 
+    @abstractmethod
+    def serialize(self) -> Optional[dict]:
+        """ Serializes current state of the system """
+
+    @abstractmethod
+    def deserialize(self, s: dict):
+        """ Deserializes current state of the system """
+
 
 i = [0]
 
@@ -57,7 +67,8 @@ class Plotter:
     def __init__(self, system: ISystem, pause: float = 0, skip_plots: int = 0,
                  plot_elements_segments: int = 30,
                  plot_basis_vectors_len: float = 1, plot_basis_vectors_segments: int = 1,
-                 next_cnt: int = 1, keep_lims: bool = False, lims=None):
+                 next_cnt: int = 1, keep_lims: bool = False, lims=None,
+                 major: dict = None, minor: dict = None, state: dict = None):
         self.fig: Figure = plt.figure()
         self.ax: Axes = self.fig.add_subplot(projection='3d')
 
@@ -77,6 +88,17 @@ class Plotter:
         self._plot_basis_vectors_segments = plot_basis_vectors_segments
         self._next_cnt = next_cnt
         self._lims = lims
+
+        self._major = major
+
+        if minor is None:
+            minor = {}
+        self._minor = minor
+
+        if state is None:
+            state = {}
+
+        self._state = state
 
     @property
     def _current_state(self) -> ISystem:
@@ -214,5 +236,85 @@ class Plotter:
             self._keep_lims = _cb.get_status()[0]
 
         cb.on_clicked(self._redrawing_callback(_keep_lims, cb))
+
+        b_save = self._add_widget(Button(self.fig.add_axes([0.015, 0.16, 0.07, 0.09]), 'Save'))
+
+        def _save():
+            file = filedialog.asksaveasfile(**fd_options, title='Save geometry to file')
+            if file is None:
+                return
+            gd = self._current_state.serialize()
+            d = {
+                'major': self._major,
+                'minor': self._minor,
+                'state': self._state,
+                'geometry': gd,
+            }
+            with file as f:
+                json.dump(d, f, indent=4)
+            print('Saved geometry!')
+
+        b_save.on_clicked(self._redrawing_callback(_save))
+
+        b_load = self._add_widget(Button(self.fig.add_axes([0.015, 0.05, 0.07, 0.09]), 'Load'))
+
+        fd_options = dict(defaultextension='json',
+                          filetypes=[('Geometry file', '.json')],
+                          initialdir='geom')
+
+        def _load():
+            file = filedialog.askopenfile(**fd_options, title='Load geometry from file')
+            if file is None:
+                return
+            with file as f:
+                d = json.load(f)
+            same = True
+            old_major_s = json.dumps(self._major)
+            new_major_s = json.dumps(d['major'])
+            if new_major_s != old_major_s:
+                same = False
+                if not messagebox.askokcancel('Load geometry from file',
+                                              f'Saved geometry has the following MAJOR:\n'
+                                              f'{new_major_s}\n'
+                                              f'while the current geometry has:\n'
+                                              f'{old_major_s}\n'
+                                              f'Continue loading?'):
+                    return
+            old_minor_s = json.dumps(self._minor)
+            new_minor_s = json.dumps(d['minor'])
+            if new_minor_s != old_minor_s:
+                same = False
+                if not messagebox.askokcancel('Load geometry from file',
+                                              f'Saved geometry has the following MINOR:\n'
+                                              f'{new_minor_s}\n'
+                                              f'while the current geometry has:\n'
+                                              f'{old_minor_s}\n'
+                                              f'Continue loading?'):
+                    return
+            old_state_s = json.dumps(self._state)
+            new_state_s = json.dumps(d['state'])
+            if new_state_s != old_state_s:
+                if messagebox.askyesno('Load geometry from file',
+                                       f'Saved geometry has the following STATE:\n'
+                                       f'{new_state_s}\n'
+                                       f'while the current geometry has:\n'
+                                       f'{old_state_s}\n'
+                                       f'Replace current state with saved?'):
+                    if not same:
+                        ans = messagebox.askyesnocancel('Load geometry from file',
+                                                        f'Saved geometry has the following STATE:\n'
+                                                        f'{new_state_s}\n'
+                                                        f'while the current geometry has:\n'
+                                                        f'{old_state_s}\n'
+                                                        f'Merge current state with saved?')
+                        if ans is None:
+                            return
+                        if not ans:
+                            self._state.clear()
+                    self._state.update(d['state'])
+            self._current_state.deserialize(d['geometry'])
+            print('Loaded geometry!')
+
+        b_load.on_clicked(self._redrawing_callback(_load))
 
         plt.show(block=True)

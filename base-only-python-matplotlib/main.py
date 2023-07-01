@@ -35,6 +35,8 @@ def Ibrahimbegovich_small(force: bool = False):
 
     initial_system = System(elements, valid_threshold=each_length * 10)
 
+    state = dict()
+
     def task():
         mult = 1
 
@@ -43,7 +45,7 @@ def Ibrahimbegovich_small(force: bool = False):
             title += ' and pert. force'
         print(title + '\n')
 
-        i = 0
+        state['i'] = 1
         while True:
             current_system: System = yield
             if current_system is None:
@@ -57,17 +59,21 @@ def Ibrahimbegovich_small(force: bool = False):
 
             yield mult, m0, f, fp
 
-            i += 1
             with printoptions(precision=10, suppress=True):
-                _i_str = str(i) + ':'
+                _i_str = str(state['i']) + ':'
                 print(f'\tIteration {_i_str:<5}',
                       current_system.guess[-1].point(current_system.guess[-1].s) -
                       initial_system.elements[-1].point(initial_system.elements[-1].s))
+            state['i'] += 1
 
     initial_system.set_task(task())
 
     # noinspection PyArgumentEqualDefault
-    visual = Plotter(initial_system, pause=0.01)
+    visual = Plotter(initial_system, pause=0.01,
+                     major={'problem': 'Ibrahimbegovich_small',
+                            'elements_count': elements_count},
+                     minor={'total_length': total_length},
+                     state=state)
     visual.show_interactive()
 
 
@@ -99,6 +105,8 @@ def Ibrahimbegovich_big(task_steps=100):
 
     displacements_s = [displacements[0]]
     displacements_s_marks = [0]
+
+    state = dict()
 
     def task():
         pts_c = 11
@@ -255,7 +263,12 @@ def Ibrahimbegovich_big(task_steps=100):
                      next_cnt=cnt, keep_lims=False,
                      lims=((-0.17443378249741953, 0.18093407976867604),
                            (-0.01892765241459829, 0.33644020985149725),
-                           (-0.007159928998741932, 0.25936596770082976)))
+                           (-0.007159928998741932, 0.25936596770082976)),
+                     major={'problem': 'Ibrahimbegovich_big',
+                            'elements_count': elements_count},
+                     minor={'total_length': total_length,
+                            'EI': EI, 'GJ': GJ},
+                     state=state)
     visual.show_interactive()
 
     if task_steps == 100:
@@ -328,9 +341,12 @@ def ideal_helix_m0():
 
     initial_system = System(elements, valid_threshold=each_length * 1000, arm_position=0)
 
+    state = dict()
+
     def task():
         mult = 1
 
+        state['i'] = 1
         while True:
             current_system: System = yield
             if current_system is None:
@@ -388,6 +404,7 @@ def ideal_helix_m0():
                        f'\tмає бути:      {ideal_end}\n'
                        f'\tрізниця:       {got_end - ideal_end}\n'
                        f'\tнорма різниці: {norm(got_end - ideal_end)}\n')
+            state['i'] += 1
 
     initial_system.set_task(task())
 
@@ -395,7 +412,13 @@ def ideal_helix_m0():
     visual = Plotter(initial_system, pause=0.01, skip_plots=0,
                      plot_elements_segments=max(1, int(30 * each_length)), plot_basis_vectors_len=a / each_length / 3,
                      next_cnt=elements_count, keep_lims=True,
-                     lims=((-a * 1.1, a * 1.1), (-a * 1.1, a * 1.1), (-0.1, 2 * pi * winds * h * 1.1)))
+                     lims=((-a * 1.1, a * 1.1), (-a * 1.1, a * 1.1), (-0.1, 2 * pi * winds * h * 1.1)),
+                     major={'problem': 'ideal_helix_1e',
+                            'elements_count': elements_count},
+                     minor={'a': a, 'h': h,
+                            'EI': EI, 'GJ': GJ,
+                            'winds': winds},
+                     state=state)
     visual.show_interactive()
 
 
@@ -456,9 +479,12 @@ def ideal_helix():
 
     initial_system = System(elements, valid_threshold=each_length * 10, arm_position=0)
 
+    state = dict()
+
     def task():
         mult = 1
 
+        state['i'] = 1
         while True:
             current_system: System = yield
             if current_system is None:
@@ -517,6 +543,7 @@ def ideal_helix():
                        f'\tмає бути:      {ideal_end}\n'
                        f'\tрізниця:       {got_end - ideal_end}\n'
                        f'\tнорма різниці: {norm(got_end - ideal_end)}\n')
+            state['i'] += 1
 
     initial_system.set_task(task())
 
@@ -524,7 +551,13 @@ def ideal_helix():
     visual = Plotter(initial_system, pause=0.01, skip_plots=0,
                      plot_elements_segments=max(1, int(30 * each_length)), plot_basis_vectors_len=a / each_length / 3,
                      next_cnt=int(2.2 * elements_count), keep_lims=True,
-                     lims=((-a * 1.1, a * 1.1), (-a * 1.1, a * 1.1), (-0.1, 2 * pi * winds * h * 1.1)))
+                     lims=((-a * 1.1, a * 1.1), (-a * 1.1, a * 1.1), (-0.1, 2 * pi * winds * h * 1.1)),
+                     major={'problem': 'ideal_helix',
+                            'elements_count': elements_count},
+                     minor={'a': a, 'h': h,
+                            'EI': EI, 'GJ': GJ,
+                            'winds': winds},
+                     state=state)
     visual.show_interactive()
 
 
@@ -583,9 +616,12 @@ def ideal_helix_1e():
 
     initial_system = System(elements, valid_threshold=each_length * 10, arm_position=0)
 
+    state = dict()
+
     def task():
         mult = 1
 
+        state['i'] = 1
         while True:
             current_system: System = yield
             if current_system is None:
@@ -644,6 +680,7 @@ def ideal_helix_1e():
                        f'\tмає бути:      {ideal_end}\n'
                        f'\tрізниця:       {got_end - ideal_end}\n'
                        f'\tнорма різниці: {norm(got_end - ideal_end)}\n')
+            state['i'] += 1
 
     initial_system.set_task(task())
 
@@ -651,7 +688,13 @@ def ideal_helix_1e():
     visual = Plotter(initial_system, pause=0.01, skip_plots=0,
                      plot_elements_segments=max(1, int(30 * each_length)), plot_basis_vectors_len=a / each_length / 3,
                      next_cnt=int(2.2 * elements_count), keep_lims=True,
-                     lims=((-a * 1.1, a * 1.1), (-a * 1.1, a * 1.1), (-0.1, 2 * pi * winds * h * 1.1)))
+                     lims=((-a * 1.1, a * 1.1), (-a * 1.1, a * 1.1), (-0.1, 2 * pi * winds * h * 1.1)),
+                     major={'problem': 'ideal_helix_1e',
+                            'elements_count': elements_count},
+                     minor={'a': a, 'h': h,
+                            'EI': EI, 'GJ': GJ,
+                            'winds': winds},
+                     state=state)
     visual.show_interactive()
 
 
@@ -691,10 +734,13 @@ def Bathe():
     la = 7.2
     force = la * EI / r ** 2
 
+    state = dict()
+
     def task():
         mult = 0.5
 
-        for i in range(101):
+        state['i'] = 1
+        while state['i'] <= 100:
             current_system = None
             while current_system is None:
                 current_system = yield
@@ -703,16 +749,24 @@ def Bathe():
             f = force * vector([0, 0, 1])
             fp = current_system.elements[-1].point(current_system.elements[-1].s)
             with printoptions(precision=10, suppress=True):
-                print(f'Ітерація {i}, остання точка = {fp}')
+                print(f'Ітерація {state["i"]}, остання точка = {fp}')
 
             yield mult, m0, f, fp
+            state['i'] += 1
 
     initial_system.set_task(task())
 
     # noinspection PyArgumentEqualDefault
     visual = Plotter(initial_system, pause=0.01, skip_plots=0,
                      plot_elements_segments=30, plot_basis_vectors_len=0.5,
-                     next_cnt=10)
+                     next_cnt=10,
+                     major={'problem': 'Bathe',
+                            'elements_count': elements_count},
+                     minor={'angle': angle,
+                            'r': r,
+                            'EI': EI, 'GJ': GJ,
+                            'la': la},
+                     state=state)
     visual.show_interactive()
 
 
@@ -739,12 +793,18 @@ def upward_force():
 
     la = 1
 
+    state = dict()
+
     def task():
         mult = 0.01
 
-        for task_mult in linspace(0, 1, 11)[1:]:
+        state['percent'] = 10
+        while state['percent'] <= 100:
+            task_mult = state['percent'] / 100
             print(f'{task_mult:%} сили')
-            for i in range(10):
+
+            state['i'] = 1
+            while state['i'] <= 10:
                 current_system = None
                 while current_system is None:
                     current_system = yield
@@ -755,13 +815,22 @@ def upward_force():
                 print(f'Last point = {fp}')
 
                 yield mult, m0, f, fp
+                state['i'] += 1
+
+            state['percent'] += 10
 
     initial_system.set_task(task())
 
     # noinspection PyArgumentEqualDefault
     visual = Plotter(initial_system, pause=0.01, skip_plots=0,
                      plot_elements_segments=30, plot_basis_vectors_len=0.5,
-                     next_cnt=100)
+                     next_cnt=100,
+                     major={'problem': 'upward_force',
+                            'elements_count': elements_count},
+                     minor={'total_length': total_length,
+                            'EI': EI, 'GJ': GJ,
+                            'la': la},
+                     state=state)
     visual.show_interactive()
 
 

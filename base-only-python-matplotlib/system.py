@@ -297,3 +297,31 @@ class System(ISystem):
                            applied_moments=self.guess_moments.copy())
         new_state.set_task(self.task_gen)
         return new_state
+
+    def serialize(self) -> Optional[dict]:
+        e_ser = lambda e: [e.serialize() for e in e] if e is not None else None
+        a_ser = lambda a: a.tolist() if a is not None else None
+
+        d = {
+            'state': self.state,
+            'doing_final_guess': self.doing_final_guess,
+            'elements': e_ser(self.elements),
+            'guess': e_ser(self.guess),
+            'final_guess': e_ser(self.final_guess),
+            'applied_moments': a_ser(self.applied_moments),
+            'guess_moments': a_ser(self.guess_moments),
+        }
+
+        return d
+
+    def deserialize(self, d: dict):
+        e_des = lambda e: [Element.deserialize(e) for e in e] if e is not None else None
+        a_des = lambda a: array(a) if a is not None else None
+
+        self.state = d['state']
+        self.doing_final_guess = d['doing_final_guess']
+        self.elements = e_des(d['elements'])
+        self.guess = e_des(d['guess'])
+        self.final_guess = e_des(d['final_guess'])
+        self.applied_moments = a_des(d['applied_moments'])
+        self.guess_moments = a_des(d['guess_moments'])

@@ -231,3 +231,28 @@ class Element:
         guess.nat = nat.copy()
 
         return guess
+
+    def serialize(self) -> dict:
+        d = {
+            'p': self.p.tolist(), 's': self.s,
+            'K0': self.K0, 'T0': self.T0,
+            'K': self.K, 'T': self.T,
+            'mat': self.mat.tolist(), 'nat': self.nat.tolist(),
+            'EI': self.EI, 'GJ': self.GJ,
+        }
+
+        return d
+
+    @staticmethod
+    def deserialize(d: dict):
+        p, s = point(d['p']), d['s']
+        K0, T0 = d['K0'], d['T0']
+        K, T = d['K'], d['T']
+        mat, nat = matrix(d['mat']), matrix(d['nat'])
+        EI, GJ = d['EI'], d['GJ']
+
+        e = Element(p, s, mat[0], mat[1], K0, T0, EI, GJ)
+        e.K, e.T = K, T
+        e.mat, e.nat = mat, nat
+
+        return e
