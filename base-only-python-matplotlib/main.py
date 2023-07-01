@@ -17,9 +17,9 @@ def dprint(*_args, **_kwargs):
 # noinspection PyPep8Naming
 # noinspection SpellCheckingInspection
 # noinspection Duplicates
-def Ibrahimbegovich_small(force: float = 0):
+def Ibrahimbegovich_small(force: bool = False):
     total_length = 10
-    elements_count = 1
+    elements_count = 10
 
     each_length = total_length / elements_count
     start_s_values = linspace(0, total_length, elements_count + 1)[:-1]
@@ -39,7 +39,7 @@ def Ibrahimbegovich_small(force: float = 0):
         mult = 1
 
         title = f'\t\t\t\t\t\tElements: {elements_count}\n\n\t\tDisplacement components under end moment'
-        if force != 0:
+        if force:
             title += ' and pert. force'
         print(title + '\n')
 
@@ -49,8 +49,10 @@ def Ibrahimbegovich_small(force: float = 0):
             if current_system is None:
                 continue
 
-            m0 = -2.5 * pi * vector([0, 0, 1])
-            f = force * vector([0, 0, 1])
+            force_val = 0.001 if force else 0
+
+            m0 = 2.5 * pi * vector([0, 0, 1])
+            f = force_val * vector([0, 0, 1])
             fp = current_system.elements[-1].point(current_system.elements[-1].s)
 
             yield mult, m0, f, fp
@@ -75,9 +77,10 @@ def Ibrahimbegovich_small(force: float = 0):
 def Ibrahimbegovich_big(task_steps=100):
     total_length = 10
     elements_count = 10
-
     each_length = total_length / elements_count
     start_s_values = linspace(0, total_length, elements_count + 1)[:-1]
+    EI = 100
+    GJ = 100
 
     elements = [Element(
         p=vector([s, 0, 0]),
@@ -85,7 +88,7 @@ def Ibrahimbegovich_big(task_steps=100):
         t=vector([1, 0, 0]),
         xi=vector([0, 1, 0]),
         K0=0, T0=0,
-        EI=100, GJ=100,
+        EI=EI, GJ=GJ,
     ) for s in start_s_values]
 
     initial_system = System(elements, valid_threshold=each_length * 100000)
@@ -773,7 +776,8 @@ def main():
 3 - спіраль з прямої балки - ідеальний хелікс m0
 4 - спіраль з прямої балки - ідеальний хелікс
 5 - спіраль з прямої балки - ідеальний хелікс, 1 елемент
-6 - спіраль з прямої балки - сила, прикладена до краю - задача Ібрагімбековича
+6 - спіраль з прямої балки - сила, прикладена до краю - задача Ібрахімбеговича
+7 - вигинання прямої балки - спрощена задача Ібрахімбеговича
   - press Enter to exit
 
 > ''')
@@ -791,21 +795,19 @@ def main():
         elif test == '5':
             ideal_helix_1e()
         elif test == '6':
-            ff = input('1 - Full force\n2 - 10 steps\n3 - 100 steps\n - press Enter to go back\n> ')
+            ff = input('1 - 1 step\n2 - 10 steps\n3 - 100 steps\n - press Enter to go back\n> ')
             if ff == '1':
                 Ibrahimbegovich_big(task_steps=1)
             elif ff == '2':
                 Ibrahimbegovich_big(task_steps=10)
             elif ff == '3':
                 Ibrahimbegovich_big(task_steps=100)
-        elif test == '3':
-            Bathe()
-        elif test == '4':
-            ideal_helix_m0()
-        elif test == '5':
-            ideal_helix()
-        elif test == '6':
-            ideal_helix_1e()
+        elif test == '7':
+            ff = input('1 - no force\n2 - small force\n> ')
+            if ff == '1':
+                Ibrahimbegovich_small()
+            elif ff == '2':
+                Ibrahimbegovich_small(force=True)
 
 
 if __name__ == '__main__':
