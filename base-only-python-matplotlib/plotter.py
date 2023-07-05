@@ -1,13 +1,14 @@
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from tkinter import filedialog, messagebox
 from typing import ClassVar, Tuple, List, Optional
-from typing_extensions import Self
+
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.widgets import Button, CheckButtons, AxesWidget, TextBox
-from tkinter import filedialog, messagebox
+from typing_extensions import Self
 
 
 @dataclass
@@ -77,7 +78,7 @@ class Plotter:
         self.element_params = DrawParams()
         self.guess_params = DrawParams()
         self.final_guess_params = DrawParams()
-        self.guess_params.line = self.final_guess_params.line = False
+        # self.guess_params.line = self.final_guess_params.line = False
         self._widgets: List[AxesWidget] = []
         self._plots_skipped = 0
         self._keep_lims = keep_lims
@@ -316,5 +317,10 @@ class Plotter:
             print('Loaded geometry!')
 
         b_load.on_clicked(self._redrawing_callback(_load))
+
+        with open('geom/1.json') as f:
+            d = json.load(f)
+        #self._current_state.deserialize(d['geometry'])
+        self._plot()
 
         plt.show(block=True)

@@ -1,6 +1,9 @@
+import numpy as np
 from matplotlib import pyplot as plt
-from numpy import array as vector, pi, sqrt, cos, sin, cross, clip, array, ceil, printoptions
+from matplotlib.widgets import Button
 from numpy import array as point
+from numpy import array as vector, pi, sqrt, cos, sin, cross, printoptions
+from numpy import dot
 from numpy import linspace
 from numpy.linalg import norm
 
@@ -106,154 +109,155 @@ def Ibrahimbegovich_big(task_steps=100):
     displacements_s = [displacements[0]]
     displacements_s_marks = [0]
 
+    g_fp_inc_norm = []
+    g_cosine = []
+    g_C_cos = []
+    g_mu = []
+    g_mult = []
+    g_mult_scale_limit = []
+
     state = dict()
 
     def task():
-        pts_c = 11
-
         for mode in ['mt']:
-            for task_mult in linspace(0, 1, task_steps + 1)[1:]:
-                if task_steps < 100:
-                    if task_mult < 0.6:
-                        mult_clip = 0.003 / task_mult
+
+            state['percent'] = int(100 / task_steps)
+            while state['percent'] <= 100:
+                task_mult = state['percent'] / 100
+                if task_mult < 0.41:
+                    state['percent'] += int(100 / task_steps)
+                    continue
+                print(f'{task_mult:%} сили')
+
+                fp_prev = None
+                fp_inc_prev = None
+                fp_inc_norm_prev = None
+                mult = 0.01
+
+                state['i'] = 1
+                while state['i'] <= 1000:
+                    current_system = None
+                    while current_system is None:
+                        current_system = yield
+
+                    if mode == 'm':
+                        m0 = task_mult * 200 * pi * vector([0, 0, 1])
+                        f = 0 * 50 * vector([0, 0, 1])
+                    elif mode == 't':
+                        m0 = 1 * 200 * pi * vector([0, 0, 1])
+                        f = -task_mult * 50 * vector([0, 0, 1])
                     else:
-                        mult_clip = 0.1
-                    max_diff_c = 20
-                    max_diff_c_hist = list()
-                    max_diff_c_hist_buf_size = 20
-                    wdt = 5
+                        m0 = task_mult * 200 * pi * vector([0, 0, 1])
+                        f = -task_mult * 50 * vector([0, 0, 1])
+                    fp = current_system.elements[-1].point(current_system.elements[-1].s)
 
-                    if task_mult <= 0.1:
-                        mult_clip = 0.2
+                    print(f'i = {state["i"]}', end='')
+                    _append = lambda a, v: a.append(v) if state['i'] >= 3 else None
+                    if fp_prev is not None:
+                        fp_inc = fp - fp_prev
+                        fp_inc_norm = norm(fp_inc)
 
-                    while max_diff_c >= wdt:
-                        current_system: System = yield
-                        if current_system is None:
-                            continue
+                        if fp_inc_prev is not None:
+                            cosine = dot(fp_inc, fp_inc_prev) / fp_inc_norm / fp_inc_norm_prev
+                            C_cos = pow(cosine, 2) / 3 + cos(cosine * pi / 2) / 100
+                            print(f'\tcos={cosine:.3}\tC_cos={C_cos:.3}', end='')
 
-                        current_pts = [e.point(e.s * i) for e in current_system.elements for i in linspace(0, 1, pts_c)]
+                            mu = 0.7
+                            if cosine > 0.4:
+                                mu = 1.1
+                            elif cosine < -0.4:
+                                mu = 0.9
+                            # cos -1 -> 0.5
+                            # cos  1 -> 1.3
 
-                        if mode == 'm':
-                            m0 = task_mult * 200 * pi * vector([0, 0, 1])
-                            f = 0 * 50 * vector([0, 0, 1])
-                        elif mode == 't':
-                            m0 = 1 * 200 * pi * vector([0, 0, 1])
-                            f = -task_mult * 50 * vector([0, 0, 1])
-                        else:
-                            m0 = task_mult * 200 * pi * vector([0, 0, 1])
-                            f = -task_mult * 50 * vector([0, 0, 1])
-                        fp = current_system.elements[-1].point(current_system.elements[-1].s)
+                            print(f'\tmu={mu}', end='')
 
-                        yield mult_clip, m0, f, fp
+                            mult *= mu
 
-                        c_begin = current_system.elements[0].point(0)
-                        c_end = current_system.elements[-1].point(current_system.elements[-1].s)
-                        displacements.append(c_end - c_begin)
+                            # print(f'\tmult={mult:.3}', end='')
+                            #
+                            # if mult < 1e-6:
+                            #     mult = 0.1
+                            #     print('\tBOOST', end='')
 
-                        final_guess_pts = [e.point(e.s * i) for e in current_system.final_guess for i in
-                                           linspace(0, 1, pts_c)]
+                            _append(g_fp_inc_norm, fp_inc_norm)
+                            _append(g_cosine, cosine)
+                            _append(g_C_cos, C_cos)
+                            _append(g_mu, mu)
+                            _append(g_mult, np.log10(mult))
 
-                        diff = [norm(p - fg_p) for p, fg_p in zip(current_pts, final_guess_pts)]
-                        max_diff = array(diff).max(initial=0)
-                        max_diff_c = max_diff / each_length * 1000
+                        fp_inc_prev = fp_inc
+                        fp_inc_norm_prev = fp_inc_norm
 
-                        max_diff_c_hist.append(max_diff_c)
-                        if len(max_diff_c_hist) > max_diff_c_hist_buf_size:
-                            max_diff_c_hist.pop(0)
+                        mult_scale_limit = total_length / 10 / fp_inc_norm
+                        _append(g_mult_scale_limit, np.log10(mult_scale_limit))
+                        if mult > mult_scale_limit:
+                            print(f'\tscale lim: {mult:.3} -> {mult_scale_limit:.3}', end='')
+                        mult = min(mult, mult_scale_limit)
 
-                        _mult = 10 / max_diff_c
-                        mult = clip(_mult, 0.001, mult_clip)
+                        mult_limit = 0.5
+                        if mult > mult_limit:
+                            print(f'\tlim: {mult:.3} -> {mult_limit:.3}', end='')
+                        mult = min(mult, mult_limit)
 
-                        _si = int(ceil(len(max_diff_c_hist) / 2))
-                        max_diff_c_hist_c = array(max_diff_c_hist[:_si]).mean() / array(max_diff_c_hist[::-1][:_si]).mean()
-                        print(f'task_mult = {float(task_mult):.3} mult_clip = {float(mult_clip):.5} '
-                              f'hist_bs = {max_diff_c_hist_buf_size} '
-                              f'max_diff_c = [[{float(max_diff_c):.5}]] max_diff_c_hist_c = {float(max_diff_c_hist_c): .5}')
+                        print(f'\tmult={mult:.3}', end='')
 
-                        if len(max_diff_c_hist) >= max_diff_c_hist_buf_size:
-                            if max_diff_c_hist_c < 1.01:
-                                max_diff_c_hist = list()
-                                mult_clip /= 10
-                                if mult_clip <= 1e-7:
-                                    mult_clip = 0.01 / task_mult
-                                    max_diff_c_hist_buf_size *= 3
-                            tt = 1.001
-                            if max_diff_c_hist_c > tt and mult_clip < 0.01 / task_mult:
-                                max_diff_c_hist = list()
-                                if task_mult < 0.6:
-                                    mult_clip *= 0.6 / task_mult
-                                else:
-                                    mult_clip *= 1.3
-                else:
-                    mult = 1
+                    fp_prev = fp
+                    print(flush=True)
 
-                    mult_clip = 0.1
-                    max_diff_c = 2
-                    max_diff_c_hist = list()
-                    max_diff_c_hist_buf_size = 100
-                    while max_diff_c >= 1:
-                        current_system: System = yield
-                        if current_system is None:
-                            continue
+                    yield mult, m0, f, fp
+                    state['i'] += 1
 
-                        current_pts = [e.point(e.s * i) for e in current_system.elements for i in linspace(0, 1, pts_c)]
+                    g_window = 100
+                    if state['i'] % g_window == 0:
+                        fig1, ax = plt.subplots()
+                        ax.set_title(f'Last {g_window}')
+                        x = range(max(state['i']-g_window, 3), state['i'])
+                        ax.plot(x, g_fp_inc_norm[-g_window:], label='fp_inc_norm')
+                        ax.plot(x, g_cosine[-g_window:], label='cosine')
+                        ax.plot(x, g_C_cos[-g_window:], label='C_cos')
+                        ax.plot(x, g_mu[-g_window:], label='mu')
+                        ax.plot(x, g_mult[-g_window:], label='log10(mult)')
+                        ax.plot(x, g_mult_scale_limit[-g_window:], label='log10(mult_scale_limit)')
+                        plt.legend()
 
-                        if mode == 'm':
-                            m0 = task_mult * -200 * pi * vector([0, 0, 1])
-                            f = 0 * 50 * vector([0, 0, 1])
-                        elif mode == 't':
-                            m0 = 1 * -200 * pi * vector([0, 0, 1])
-                            f = task_mult * 50 * vector([0, 0, 1])
-                        else:
-                            m0 = task_mult * -200 * pi * vector([0, 0, 1])
-                            f = task_mult * 50 * vector([0, 0, 1])
-                        fp = current_system.elements[-1].point(current_system.elements[-1].s)
+                        fig2, ax = plt.subplots()
+                        ax.set_title('All')
+                        x = range(3, state['i'])
+                        ax.plot(x, g_fp_inc_norm, label='fp_inc_norm')
+                        ax.plot(x, g_cosine, label='cosine')
+                        ax.plot(x, g_C_cos, label='C_cos')
+                        ax.plot(x, g_mu, label='mu')
+                        ax.plot(x, g_mult, label='log10(mult)')
+                        ax.plot(x, g_mult_scale_limit, label='log10(mult_scale_limit)')
+                        plt.legend()
+                        plt.pause(0.1)
 
-                        yield mult_clip, m0, f, fp
+                        _stop = [False]
 
-                        c_begin = current_system.elements[0].point(0)
-                        c_end = current_system.elements[-1].point(current_system.elements[-1].s)
-                        displacements.append(c_end - c_begin)
+                        def stop(*_args):
+                            _stop[0] = True
 
-                        final_guess_pts = [e.point(e.s * i) for e in current_system.final_guess for i in
-                                           linspace(0, 1, pts_c)]
+                        b = Button(fig2.add_axes([0.81, 0.15, 0.1, 0.045]), 'Close')
+                        b.on_clicked(stop)
 
-                        diff = [norm(p - fg_p) for p, fg_p in zip(current_pts, final_guess_pts)]
-                        max_diff = array(diff).max(initial=0)
-                        max_diff_c = max_diff / each_length * 1000
+                        while not _stop[0]:
+                            plt.pause(1)
 
-                        max_diff_c_hist.append(max_diff_c)
-                        if len(max_diff_c_hist) > max_diff_c_hist_buf_size:
-                            max_diff_c_hist.pop(0)
+                        plt.pause(0.1)
+                        plt.close(fig1)
+                        plt.close(fig2)
+                        plt.pause(0.1)
 
-                        _mult = 10 / max_diff_c
-                        mult = clip(_mult, 0.001, mult_clip)
-
-                        _si = int(ceil(len(max_diff_c_hist) / 2))
-                        max_diff_c_hist_c = array(max_diff_c_hist[:_si]).mean() / array(
-                            max_diff_c_hist[::-1][:_si]).mean()
-                        print(f'task_mult = {task_mult} mult_clip = {mult_clip} hist_bs = {max_diff_c_hist_buf_size} '
-                              f'max_diff_c = {max_diff_c:.5} max_diff_c_hist_c = {max_diff_c_hist_c: .5}')
-
-                        if len(max_diff_c_hist) >= max_diff_c_hist_buf_size and max_diff_c_hist_c < 1.1:
-                            max_diff_c_hist = list()
-                            mult_clip /= 10
-                            if mult_clip <= 1e-10:
-                                mult_clip = 1
-                                max_diff_c_hist_buf_size *= 10
-
-                print('Bingo', flush=True)
-                displacements_marks.append(len(displacements) - 1)
-                displacements_s_marks.append(len(displacements_s))
-                displacements_s.append(displacements[-1])
+                state['percent'] += int(100 / task_steps)
 
     initial_system.set_task(task())
 
     cnt = 100
     skip = 0
     if task_steps == 10:
-        cnt = 5730
-        skip = 9
+        cnt = 1000
+        # skip = 4
     elif task_steps == 100:
         cnt = 10000
         skip = 99
@@ -271,20 +275,20 @@ def Ibrahimbegovich_big(task_steps=100):
                      state=state)
     visual.show_interactive()
 
-    if task_steps == 100:
-        displacements_s = [d[2] for d in vector(displacements_s)]
-        plt.plot(displacements_s, range(len(displacements_s)))
-        for mark in displacements_s_marks[::10]:
-            plt.axhline(mark, linestyle='--', alpha=0.5)
-        plt.title('Free-end displacement component in the direction of applied force (only for task steps)')
-        plt.show()
-
-        displacements = [d[2] for d in vector(displacements)]
-        plt.plot(displacements, range(len(displacements)))
-        for mark in displacements_marks[::10]:
-            plt.axhline(mark, linestyle='--', alpha=0.5)
-        plt.title('Free-end displacement component in the direction of applied force')
-        plt.show()
+    # if task_steps == 100 or True:
+    #     displacements_s = [d[2] for d in vector(displacements_s)]
+    #     plt.plot(displacements_s, range(len(displacements_s)))
+    #     for mark in displacements_s_marks[::10]:
+    #         plt.axhline(mark, linestyle='--', alpha=0.5)
+    #     plt.title('Free-end displacement component in the direction of applied force (only for task steps)')
+    #     plt.show()
+    #
+    #     displacements = [d[2] for d in vector(displacements)]
+    #     plt.plot(displacements, range(len(displacements)))
+    #     for mark in displacements_marks[::10]:
+    #         plt.axhline(mark, linestyle='--', alpha=0.5)
+    #     plt.title('Free-end displacement component in the direction of applied force')
+    #     plt.show()
 
 
 # noinspection PyPep8Naming
@@ -871,6 +875,7 @@ def main():
                 Ibrahimbegovich_big(task_steps=10)
             elif ff == '3':
                 Ibrahimbegovich_big(task_steps=100)
+            return
         elif test == '7':
             ff = input('1 - no force\n2 - small force\n> ')
             if ff == '1':

@@ -179,9 +179,9 @@ class System(ISystem):
 
             _ratio[0] = mult
 
-        # self.guess = [e.apply_moment(_m) for e, _m in zip(self.elements, self.guess_moments)]
+        self.guess = [e.apply_moment(_m) for e, _m in zip(self.elements, self.guess_moments)]
 
-        self.guess = [e.interpolate(f, _ratio[0]) for e, f in zip(self.elements, self.final_guess)]
+        # self.guess = [e.interpolate(f, _ratio[0]) for e, f in zip(self.elements, self.final_guess)]
 
         # self.guess = self.final_guess
 
