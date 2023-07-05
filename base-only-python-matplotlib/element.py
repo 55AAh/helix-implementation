@@ -1,11 +1,12 @@
+from dataclasses import dataclass
 from typing import Tuple
-from numpy.linalg import norm
-from numpy import vstack, pi, cross, sqrt, sin, cos, arccos, dot
+
+from numpy import array as matrix
 from numpy import array as point
 from numpy import array as vector
-from numpy import array as matrix
-from dataclasses import dataclass
-from numpy import clip
+from numpy import clip, allclose
+from numpy import vstack, pi, cross, sqrt, sin, cos, arccos, dot
+from numpy.linalg import norm
 
 
 def dprint(*_args, **_kwargs):
@@ -231,6 +232,51 @@ class Element:
         guess.nat = nat.copy()
 
         return guess
+
+    def interpolate(self, other: 'Element', ratio: float) -> 'Element':
+        """ Прикладає момент до елементу
+
+        :param other: інший елемент
+        :param ratio: коефіцієнт інтерполяції
+        :return: новий проміжний елемент
+        :rtype: Element
+        """
+
+        assert allclose(self.p, other.p)
+        assert self.s == other.s
+        assert self.K0 == other.K0
+        assert self.T0 == other.T0
+        assert self.EI == other.EI
+        assert self.GJ == other.GJ
+        assert allclose(self.mat, other.mat)
+        assert allclose(self.nat[0], other.nat[0])
+
+        t, xi, eta = self.mat
+
+        between = Element(self.p.copy(), self.s, t.copy(), xi.copy(), self.K0, self.T0, self.EI, self.GJ)
+
+        this_K, this_T = self.K, self.T
+        other_K, other_T = other.K, other.T
+
+        K = this_K + (other_K - this_K) * ratio
+        T = this_T + (other_T - this_T) * ratio
+
+        between.K = K
+        between.T = T
+
+        t, this_n, this_beta = self.nat
+        t, other_n, other_beta = other.nat
+
+        n = this_n * (1 - ratio) + other_n * ratio
+        beta = this_beta * (1 - ratio) + other_beta * ratio
+
+        n /= norm(n)
+        beta /= norm(beta)
+
+        nat = vstack((t, n, beta))
+        between.nat = nat.copy()
+
+        return between
 
     def serialize(self) -> dict:
         d = {

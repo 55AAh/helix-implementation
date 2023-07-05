@@ -1,9 +1,9 @@
-from matplotlib.axes import Axes
-from numpy import linspace, cross, array, arccos, clip, dot, pi, cos, sin, vstack
-from numpy import array as vector
-from numpy import array as point
 from typing import List, Generator, Tuple, Optional
 
+from matplotlib.axes import Axes
+from numpy import array as point
+from numpy import array as vector
+from numpy import linspace, cross, array, arccos, clip, dot, pi, cos, sin, vstack
 from numpy.linalg import norm
 from typing_extensions import Self
 
@@ -131,6 +131,8 @@ class System(ISystem):
         if self.state != 'start':
             return
 
+        _ratio = [1]
+
         if self.doing_final_guess:
             try:
                 mult, m0, force, force_point = self.task_gen.send(self)
@@ -175,7 +177,11 @@ class System(ISystem):
             n = a + (g - a) * mult
             self.guess_moments = n
 
-        self.guess = [e.apply_moment(_m) for e, _m in zip(self.elements, self.guess_moments)]
+            _ratio[0] = mult
+
+        # self.guess = [e.apply_moment(_m) for e, _m in zip(self.elements, self.guess_moments)]
+
+        self.guess = [e.interpolate(f, _ratio[0]) for e, f in zip(self.elements, self.final_guess)]
 
         # self.guess = self.final_guess
 
