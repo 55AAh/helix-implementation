@@ -7,7 +7,7 @@ from matplotlib.axes import Axes
 from matplotlib.widgets import Button
 from numpy import array as point, log10, arccos, clip
 from numpy import array as vector
-from numpy import linspace, cross, array, dot, pi, cos
+from numpy import linspace, cross, array, dot, pi, cos, abs
 from numpy.linalg import norm
 
 from element import Element
@@ -21,14 +21,14 @@ def dprint(*_args, **_kwargs):
 
 @dataclass
 class Params:
-    arm_position: float = 0.5
+    arm_position: float = 0
     percent_steps: int = 1
     criteria_goal: float = 1e-12
     criteria_final_goal: float = 1e-12
-    dTh_diff_angle_max_limit: float = 1.0
-    dTh_diff_angle_mean_limit: float = 1.0
-    T_diff_max_limit: float = 1.0
-    T_diff_mean_limit: float = 1.0
+    dTh_diff_angle_max_limit: float = pi / 10
+    dTh_diff_angle_mean_limit: float = pi / 10
+    T_diff_max_limit: float = 0.1
+    T_diff_mean_limit: float = 0.1
     last_point_diff_prop_limit: float = 0.1
 
     def serialize(self) -> dict:
@@ -362,7 +362,7 @@ class System(ISystem):
             dTh_diff_angle_max = max(dTh_diff_angles)
             dTh_diff_angle_mean = sum(dTh_diff_angles) / len(self.elements)
 
-            T_diffs = [g.T - e.T for e, g in zip(self.elements, self.guess)]
+            T_diffs = [abs(g.T - e.T) for e, g in zip(self.elements, self.guess)]
             T_diff_max = max(T_diffs)
             T_diff_mean = sum(T_diffs) / len(self.elements)
 
@@ -426,7 +426,7 @@ class System(ISystem):
             return new_state
 
         if self.state == States.SatisfyingCriteria:
-            self.ratio /= (self.max_criteria * 1.001)
+            self.ratio /= (self.max_criteria * 1.01)
             self.state = States.SolvingTask
             return
 
@@ -434,6 +434,7 @@ class System(ISystem):
             self.guess = None
             if self.percent >= 100:
                 self.state = States.Finished
+                self.task_gen.send(self)  # In order to save 100% to results list
                 return
             else:
                 self.state = States.IncrementingLoad

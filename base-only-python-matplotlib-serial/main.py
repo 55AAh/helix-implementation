@@ -107,6 +107,7 @@ def Bathe():
             with printoptions(precision=10, suppress=True):
                 print(f'Ітерація {system.iteration}, остання точка = {fp}')
             system = yield Task(m0, f, fp)
+        yield
 
     initial_system = System(
         task(),
@@ -195,9 +196,8 @@ def Ibrahimbegovich_small(force: bool = False):
     visual.show_interactive()
 
 
-def Ibrahimbegovich_big(percent_steps=1):
+def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
     total_length = 10
-    elements_count = 10
     each_length = total_length / elements_count
     start_s_values = linspace(0, total_length, elements_count + 1)[:-1]
     EI = 100
@@ -255,7 +255,7 @@ def Ibrahimbegovich_big(percent_steps=1):
             c_begin = system.elements[0].point(0)
             c_end = system.get_last_point()
             data['displacements'].append((c_end - c_begin).tolist())
-            if system.percent != _percent:
+            if system.percent != _percent or system.state.name == 'Finished':
                 data['displacements_marks'].append(len(data['displacements']) - 1)
                 data['displacements_p_marks'].append(len(data['displacements_p']))
                 data['displacements_p'].append(data['displacements'][-1])
@@ -264,8 +264,10 @@ def Ibrahimbegovich_big(percent_steps=1):
         task(),
         elements,
         params=Params(
+            arm_position=0.5,
             percent_steps=percent_steps,
-            criteria_goal=0.01,
+            criteria_goal=1e-7,
+            criteria_final_goal=1e-7,
         ),
     )
 
@@ -391,7 +393,7 @@ def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
 
     # _beta = (_mm - dot(_mm, ideal_ts[0]) * ideal_ts[0]) / EI
     # _dTh_norm = norm(_beta * each_length)
-    _dTh_diff_angle = pi / 2
+    # _dTh_diff_angle = pi / 2
     _T = dot(_mm, ideal_ts[0]) / GJ
     _last_point_diff_ratio = a / ah_sr
 
@@ -410,8 +412,8 @@ def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
             system = yield Task(m0, f, fp)
 
     criteria_guesses = {
-        'dTh_diff_angle_max_limit': _dTh_diff_angle * 1.001,
-        'dTh_diff_angle_mean_limit': _dTh_diff_angle * 1.001,
+        'dTh_diff_angle_max_limit': 0.001,
+        'dTh_diff_angle_mean_limit': 0.001,
         'T_diff_max_limit': _T * 1.001,
         'T_diff_mean_limit': _T * 1.001,
         'last_point_diff_prop_limit': _last_point_diff_ratio * 1.001,
@@ -421,7 +423,6 @@ def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
         task(),
         elements,
         params=Params(
-            arm_position=0,
             **(criteria_guesses if guess_needed_criteria else dict()),
             criteria_goal=0.000001,
             criteria_final_goal=0.000001,
@@ -472,24 +473,32 @@ def main():
 
         elif test == '3':
             variant = input('''
-1 - один елемент
-2 - 20 елементів
-3 - один елемент, m0
-4 - 20 елементів, m0
+1   - один елемент
+1*  - один елемент, m0
+2   - 20 елементів
+2*  - 20 елементів, m0
+i1  - один елемент       1 ітерація    
+i1* - один елемент, m0   1 ітерація
+i2  - 20 елементів       1 ітерація
+i2* - 20 елементів, m0   1 ітерація
   - press Enter to go back
 > ''')
-            gnc = input('''
-y - штучно завищити ліміти критеріїв для рішення за 1 ітерацію
-n - звичайні ліміти
-> ''') == 'y'
             if variant == '1':
-                ideal_helix(elements_count=1, guess_needed_criteria=gnc)
+                ideal_helix(elements_count=1)
+            elif variant == '1*':
+                ideal_helix(elements_count=1, use_m0=True)
             elif variant == '2':
-                ideal_helix(elements_count=20, guess_needed_criteria=gnc)
-            elif variant == '3':
-                ideal_helix(elements_count=1, use_m0=True, guess_needed_criteria=gnc)
-            elif variant == '4':
-                ideal_helix(elements_count=20, use_m0=True, guess_needed_criteria=gnc)
+                ideal_helix(elements_count=20)
+            elif variant == '2*':
+                ideal_helix(elements_count=20, use_m0=True)
+            elif variant == 'i1':
+                ideal_helix(elements_count=1, guess_needed_criteria=True)
+            elif variant == 'i1*':
+                ideal_helix(elements_count=1, use_m0=True, guess_needed_criteria=True)
+            elif variant == 'i2':
+                ideal_helix(elements_count=20, guess_needed_criteria=True)
+            elif variant == 'i2*':
+                ideal_helix(elements_count=20, use_m0=True, guess_needed_criteria=True)
 
         elif test == '4':
             variant = input('''
@@ -504,10 +513,14 @@ n - звичайні ліміти
 
         elif test == '5':
             variant = input('''
-1 - 1 крок
-2 - 10 кроків
-3 - 100 кроків
-4 - 1000 кроків
+1  - 1 крок         10  елементів
+2  - 10 кроків      10  елементів
+3  - 100 кроків     10  елементів
+4  - 1000 кроків    10  елементів
+1* - 1 крок         100 елементів
+2* - 10 кроків      100 елементів
+3* - 100 кроків     100 елементів
+4* - 1000 кроків    100 елементів
   - press Enter to go back
 > ''')
             if variant == '1':
@@ -518,6 +531,14 @@ n - звичайні ліміти
                 Ibrahimbegovich_big(percent_steps=100)
             elif variant == '4':
                 Ibrahimbegovich_big(percent_steps=1000)
+            elif variant == '1*':
+                Ibrahimbegovich_big(percent_steps=1, elements_count=100)
+            elif variant == '2*':
+                Ibrahimbegovich_big(percent_steps=10, elements_count=100)
+            elif variant == '3*':
+                Ibrahimbegovich_big(percent_steps=100, elements_count=100)
+            elif variant == '4*':
+                Ibrahimbegovich_big(percent_steps=1000, elements_count=100)
 
 
 if __name__ == '__main__':

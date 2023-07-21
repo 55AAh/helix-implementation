@@ -1,3 +1,4 @@
+import io
 import json
 import os.path
 from abc import ABC, abstractmethod
@@ -352,7 +353,6 @@ class Plotter:
                 _write = f.write
 
                 def write_wrapper(chunk):
-                    chunk = chunk.replace('\r\n', '\n').replace('\n', '\r\n')
                     _write(chunk)
                     pbar.update(len(chunk))
 
@@ -380,13 +380,15 @@ class Plotter:
                 _read = f.read
 
                 def read_wrapper():
-                    data = b''
+                    buffer = io.BytesIO()
                     while True:
-                        chunk = _read(81920)
+                        chunk = _read(1024 * 1000)
                         pbar.update(len(chunk))
-                        data += chunk
+                        buffer.write(chunk)
                         if not chunk:
                             break
+                    data = buffer.getvalue()
+                    buffer.close()
                     return data
 
                 f.read = read_wrapper
