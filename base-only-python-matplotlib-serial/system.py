@@ -14,9 +14,9 @@ from element import Element
 from plotter import ISystem, DrawParams
 
 
-def dprint(*_args, **_kwargs):
-    # print(*_args, **_kwargs)
-    pass
+# def dprint(*_args, **_kwargs):
+#     # print(*_args, **_kwargs)
+#     pass
 
 
 USE_THRESHOLD = False
@@ -418,12 +418,12 @@ class System(ISystem):
                 log10_criteria = log10(self.max_criteria)
                 log10_threshold = log10(self.threshold)
                 Stats(self.shared_data).add(cosine, C_cos, mu, log10_ratio, log10_criteria, log10_threshold)
-                dprint(f'cosine: {cosine:.3g}\t'
-                       f'C_cos: {C_cos:.3g}\t'
-                       f'mu: {mu:.3g}\t'
-                       f'ratio: {self.ratio:.3g}\t'
-                       f'max_criteria: {self.max_criteria:.3g}\t'
-                       f'threshold: {self.threshold:.3g}')
+                # dprint(f'cosine: {cosine:.3g}\t'
+                #        f'C_cos: {C_cos:.3g}\t'
+                #        f'mu: {mu:.3g}\t'
+                #        f'ratio: {self.ratio:.3g}\t'
+                #        f'max_criteria: {self.max_criteria:.3g}\t'
+                #        f'threshold: {self.threshold:.3g}')
 
                 min_limit = min(self.ratio, cosine_limit)
                 new_ratio = min(min_limit * mu, 1 / 3)

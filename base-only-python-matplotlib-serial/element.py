@@ -9,9 +9,9 @@ from numpy import vstack, pi, cross, sqrt, sin, cos, arccos, dot
 from numpy.linalg import norm
 
 
-def dprint(*_args, **_kwargs):
-    # print(*_args, **_kwargs)
-    pass
+# def dprint(*_args, **_kwargs):
+#     # print(*_args, **_kwargs)
+#     pass
 
 
 @dataclass
@@ -186,24 +186,24 @@ class Element:
         # m_xi = proj[1] / self.EI
         # m_eta = proj[2] / self.EI
 
-        dprint(f'Дали момент:\n'
-               f'\tm = {m}\n')
+        # dprint(f'Дали момент:\n'
+        #        f'\tm = {m}\n')
 
         t, xi, eta = self.mat
-        dprint(f'Маємо матеріальні базиси:\n'
-               f'\tt = {t}\n'
-               f'\tξ = {xi}\n'
-               f'\tη = {eta}\n')
+        # dprint(f'Маємо матеріальні базиси:\n'
+        #        f'\tt = {t}\n'
+        #        f'\tξ = {xi}\n'
+        #        f'\tη = {eta}\n')
 
         m_t = dot(m, t) / self.GJ
         m_xi = dot(m, xi) / self.EI
         m_eta = dot(m, eta) / self.EI
-        dprint(f'Розкладаємо за базисами:\n'
-               f'\tm_t = {m_t}\n'
-               f'\tm_ξ = {m_xi}\n'
-               f'\tm_η = {m_eta}\n')
-        dprint(f'\tK0  = {self.K0}\n'
-               f'\tT0  = {self.T0}\n')
+        # dprint(f'Розкладаємо за базисами:\n'
+        #        f'\tm_t = {m_t}\n'
+        #        f'\tm_ξ = {m_xi}\n'
+        #        f'\tm_η = {m_eta}\n')
+        # dprint(f'\tK0  = {self.K0}\n'
+        #        f'\tT0  = {self.T0}\n')
 
         # T = self.T0 - m_t
         # _beta = -m_xi * xi + (self.K0 - m_eta) * eta
@@ -212,33 +212,33 @@ class Element:
         # TODO мінуси? В мене M = arm x F
         T = self.T0 + m_t
         _beta = m_xi * xi + (self.K0 + m_eta) * eta
-        dprint(f'Маємо\n'
-               f'\tm_ξ·ξ + (K0 + m_η)·η = {_beta}\n')
+        # dprint(f'Маємо\n'
+        #        f'\tm_ξ·ξ + (K0 + m_η)·η = {_beta}\n')
 
         dTh = _beta * self.s
         K = norm(_beta)
 
-        dprint(f'Отримали кривизну та скрут:\n'
-               # f'\tT = -m_t                 = {T}\n'
-               f'\tT = m_t                 = {T}\n'
-               f'\tK = norm(_beta) = {norm(_beta)}\n'
-               f'\tK = sqrt(m_ξ^2 + m_η^2) = {K}\n')
+        # dprint(f'Отримали кривизну та скрут:\n'
+        #        # f'\tT = -m_t                 = {T}\n'
+        #        f'\tT = m_t                 = {T}\n'
+        #        f'\tK = norm(_beta) = {norm(_beta)}\n'
+        #        f'\tK = sqrt(m_ξ^2 + m_η^2) = {K}\n')
 
         if K != 0:  # TODO Його можна визначити лише в цьому випадку
             beta = _beta / K
         else:
             beta = eta
 
-        dprint(f'Маємо\n'
-               f'\tβ               = {beta}\n')
+        # dprint(f'Маємо\n'
+        #        f'\tβ               = {beta}\n')
 
         n = cross(beta, t)
-        dprint(f'Знаходимо n як векторний добуток:\n'
-               f'\tn = β x t = {n}\n')
+        # dprint(f'Знаходимо n як векторний добуток:\n'
+        #        f'\tn = β x t = {n}\n')
 
         nat = vstack((t, n, beta))
-        dprint(f'Отже, новий природний базис:\n'
-               f'{nat}\n')
+        # dprint(f'Отже, новий природний базис:\n'
+        #        f'{nat}\n')
 
         guess = self.copy()
         guess.dTh = dTh
