@@ -19,12 +19,18 @@ def dprint(*_args, **_kwargs):
     pass
 
 
+USE_THRESHOLD = False
+
+
 @dataclass
 class Params:
     arm_position: float = 0
     percent_steps: int = 1
     criteria_goal: float = 1e-12
     criteria_final_goal: float = 1e-12
+    initial_threshold: float = 1.0
+    max_threshold: float = 1.0
+    threshold_goal: float = 1e-12
     dTh_diff_angle_max_limit: float = pi / 10
     dTh_diff_angle_mean_limit: float = pi / 10
     T_diff_max_limit: float = 0.1
@@ -71,6 +77,7 @@ class Stats:
         stats['g_mu'] = []
         stats['g_log10_ratio'] = []
         stats['g_log10_criteria'] = []
+        stats['g_log10_threshold'] = []
         stats['g_window_start'] = 0
         self._shared_data['stats'] = stats
 
@@ -78,13 +85,14 @@ class Stats:
         stats = self._shared_data['stats']
         stats['g_window_start'] = len(stats['g_cosine'])
 
-    def add(self, cosine, C_cos, mu, log10_ratio, log10_criteria):
+    def add(self, cosine, C_cos, mu, log10_ratio, log10_criteria, log10_threshold):
         stats = self._shared_data['stats']
         stats['g_cosine'].append(cosine)
         stats['g_C_cos'].append(C_cos)
         stats['g_mu'].append(mu)
         stats['g_log10_ratio'].append(log10_ratio)
         stats['g_log10_criteria'].append(log10_criteria)
+        stats['g_log10_threshold'].append(log10_threshold)
 
     def show(self):
         stats = self._shared_data['stats']
@@ -97,6 +105,7 @@ class Stats:
         ax.plot(x, stats['g_mu'], '.-', label='mu')
         ax.plot(x, stats['g_log10_ratio'], '.-', label='log10_ratio')
         ax.plot(x, stats['g_log10_criteria'], '.-', label='log10_criteria')
+        ax.plot(x, stats['g_log10_threshold'], '.-', label='log10_threshold')
         plt.legend()
         plt.pause(0.1)
 
@@ -109,6 +118,7 @@ class Stats:
         ax.plot(x, stats['g_mu'][_window_start:], '.-', label='mu')
         ax.plot(x, stats['g_log10_ratio'][_window_start:], '.-', label='log10_ratio')
         ax.plot(x, stats['g_log10_criteria'][_window_start:], '.-', label='log10_criteria')
+        ax.plot(x, stats['g_log10_threshold'][_window_start:], '.-', label='log10_threshold')
         plt.legend()
 
         _stop = [False]
@@ -158,6 +168,7 @@ class System(ISystem):
     ratio: Optional[float]
     max_criteria: Optional[float]
     last_point_diff_prev: Optional[vector]
+    threshold: Optional[float]
     iteration: Optional[int]
     percent: Optional[float]
 
@@ -187,6 +198,7 @@ class System(ISystem):
         self.ratio = None
         self.max_criteria = None
         self.last_point_diff_prev = None
+        self.threshold = None
         self.iteration = None
         self.percent = None
 
@@ -303,6 +315,7 @@ class System(ISystem):
         if self.state == States.IncrementingLoad:
             new_state = self.clone_initial()
             new_state.percent = self.percent + 100 / self.params.percent_steps
+            new_state.threshold = self.params.initial_threshold
             new_state.iteration = 0
             new_state.ratio = 1.0
             Stats(self.shared_data).start_window()
@@ -381,12 +394,12 @@ class System(ISystem):
             ]
             self.max_criteria = max(criteria)
 
-            if self.max_criteria >= 1:
+            if self.max_criteria >= (self.threshold if USE_THRESHOLD else 1):
                 self.state = States.SatisfyingCriteria
                 return
 
             goal = self.params.criteria_goal if self.percent < 100 else self.params.criteria_final_goal
-            if self.max_criteria < goal:
+            if self.max_criteria < goal and (not USE_THRESHOLD or self.threshold < self.params.threshold_goal):
                 self.state = States.SolvedTask
                 return
 
@@ -403,17 +416,21 @@ class System(ISystem):
                 # cos  1 -> 1.3
                 log10_ratio = log10(self.ratio)
                 log10_criteria = log10(self.max_criteria)
-                Stats(self.shared_data).add(cosine, C_cos, mu, log10_ratio, log10_criteria)
+                log10_threshold = log10(self.threshold)
+                Stats(self.shared_data).add(cosine, C_cos, mu, log10_ratio, log10_criteria, log10_threshold)
                 dprint(f'cosine: {cosine:.3g}\t'
                        f'C_cos: {C_cos:.3g}\t'
                        f'mu: {mu:.3g}\t'
                        f'ratio: {self.ratio:.3g}\t'
-                       f'max_criteria: {self.max_criteria:.3g}')
+                       f'max_criteria: {self.max_criteria:.3g}\t'
+                       f'threshold: {self.threshold:.3g}')
 
                 min_limit = min(self.ratio, cosine_limit)
                 new_ratio = min(min_limit * mu, 1 / 3)
+                new_threshold = min(self.threshold, self.threshold * mu, self.params.max_threshold)
             else:
                 new_ratio = self.ratio
+                new_threshold = self.threshold
 
             new_state = System(self.task_gen, self.guess, params=self.params, shared_data=self.shared_data,
                                builtin_moments=self.applied_moments)
@@ -422,11 +439,12 @@ class System(ISystem):
             new_state.iteration = self.iteration + 1
             new_state.ratio = new_ratio
             new_state.max_criteria = self.max_criteria
+            new_state.threshold = new_threshold
             new_state.state = States.UpdatingTask
             return new_state
 
         if self.state == States.SatisfyingCriteria:
-            self.ratio /= (self.max_criteria * 1.01)
+            self.ratio /= (self.max_criteria / (self.threshold if USE_THRESHOLD else 1) * 1.01)
             self.state = States.SolvingTask
             return
 
@@ -475,6 +493,7 @@ class System(ISystem):
         t += f'\niteration: {self.iteration}'
         t += f'\nratio: {pp(self.ratio, 5) if self.ratio is not None else None}'
         t += f'\ncrit: {pp(self.max_criteria, 5) if self.max_criteria is not None else None}'
+        t += f'\ntr: {pp(self.threshold, 5) if self.threshold is not None else None}'
         return t
 
     def show_stats(self):
@@ -501,6 +520,7 @@ class System(ISystem):
             'ratio': self.ratio,
             'max_criteria': self.max_criteria,
             'last_point_diff_prev': np_ser(self.last_point_diff_prev),
+            'threshold': self.threshold,
             'iteration': self.iteration,
             'percent': self.percent,
 
@@ -527,6 +547,7 @@ class System(ISystem):
         system.ratio = d['ratio']
         system.max_criteria = d['max_criteria']
         system.last_point_diff_prev = np_des(d['last_point_diff_prev'])
+        system.threshold = d['threshold']
         system.iteration = d['iteration']
         system.percent = d['percent']
 

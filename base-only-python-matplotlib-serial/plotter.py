@@ -181,7 +181,7 @@ class Plotter:
             cb.on_clicked(self._redrawing_callback(lambda _dp, _cb: _dp.update(*_cb.get_status()), draw_params, cb))
 
         # State text
-        self.state_text = self.fig.text(0.43, 0.11, self._current_state.get_state_text())
+        self.state_text = self.fig.text(0.43, 0.085, self._current_state.get_state_text())
 
         # Compute next & revert
 

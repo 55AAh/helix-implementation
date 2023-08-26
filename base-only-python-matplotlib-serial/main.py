@@ -54,6 +54,7 @@ def upward_force():
             percent_steps=percent_steps,
             criteria_goal=0.001,
             criteria_final_goal=0.0000001,
+            threshold_goal=0.01,
         ),
     )
 
@@ -112,7 +113,11 @@ def Bathe():
     initial_system = System(
         task(),
         elements,
-        params=Params(),
+        params=Params(
+            criteria_goal=1e-7,
+            criteria_final_goal=1e-7,
+            threshold_goal=0.1,
+        ),
     )
 
     # noinspection PyArgumentEqualDefault
@@ -175,7 +180,9 @@ def Ibrahimbegovich_small(force: bool = False):
     initial_system = System(
         task(),
         elements,
-        params=Params(),
+        params=Params(
+            threshold_goal=0.01,
+        ),
     )
 
     # noinspection PyArgumentEqualDefault
@@ -268,6 +275,7 @@ def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
             percent_steps=percent_steps,
             criteria_goal=1e-7,
             criteria_final_goal=1e-7,
+            threshold_goal=1.1,
         ),
     )
 
@@ -426,6 +434,7 @@ def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
             **(criteria_guesses if guess_needed_criteria else dict()),
             criteria_goal=0.000001,
             criteria_final_goal=0.000001,
+            threshold_goal=1.1,
         ),
     )
 
