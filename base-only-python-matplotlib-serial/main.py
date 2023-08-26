@@ -1,4 +1,8 @@
+import io
+import os
+
 from matplotlib import pyplot as plt
+from matplotlib.widgets import Button, CheckButtons
 from numpy import array as point
 from numpy import array as vector, pi, sqrt, cos, sin, cross, printoptions
 from numpy import dot
@@ -11,12 +15,90 @@ from plotter import Plotter
 from system import System, Params, Task
 
 
-INTERACTIVE = input('Interactive ? (y/n): ') == 'y'
+class GlobalParams:
+    def __init__(self):
+        self.interactive = True
+        self.batch = False
+        self.save_analytic_plots = False
+        self.show_analytic_plots = True
+        self.use_threshold = True
+        self.arm_position = 0.0
+        self.arm_position_i = False
+        self.arm_position_m = False
+
+    def pick(self):
+        if input('Use gui? (y/n): ') == 'y':
+            fig, _ax = plt.subplots()
+            plt.axis('off')
+            cb_params = {
+                'Interactive': 'interactive',
+                'Run tests in batch': 'batch',
+                'Save analytic plots': 'save_analytic_plots',
+                'Show analytic plots': 'show_analytic_plots',
+                'Use threshold': 'use_threshold',
+                'Arm position inverted': 'arm_position_i',
+                'Arm position at middle': 'arm_position_m',
+            }
+            cb = CheckButtons(fig.add_axes([0.05, 0.3, 0.9, 0.6]),
+                              labels=list(cb_params.keys()),
+                              actives=[self.__dict__[k] for k in cb_params.values()])
+            cb.on_clicked(lambda *e, **k: print(cb.get_status()))
+
+            save_button = Button(fig.add_axes([0.05, 0.1, 0.2, 0.1]), 'Save')
+            save_button.on_clicked(lambda _: plt.close())
+            plt.show(block=True)
+            self.arm_position = 0.5 if self.arm_position_m else (1.0 if self.arm_position_i else 0.0)
+        else:
+            self.interactive = input('Interactive? (y/n): ') == 'y'
+            self.batch = input('Run tests in batch? (y/n): ') == 'y'
+            self.save_analytic_plots = input('Save analytic plots? (y/n): ') == 'y'
+            self.show_analytic_plots = input('Show analytic plots? (y/n): ') == 'y'
+            self.use_threshold = input('Use threshold? (y/n): ') == 'y'
+            self.arm_position = float(input('Arm position? (float): '))
+
+
+global_params = GlobalParams()
 
 
 def dprint(*_args, **_kwargs):
     print(*_args, **_kwargs)
     pass
+
+
+def save_fig(file_path):
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    plt.savefig(file_path)
+
+
+class SilentPrinter:
+    rewrite_last_printed = False
+    original_print = None
+    last_printed = ''
+
+    def __enter__(self):
+        SilentPrinter.rewrite_last_printed = True
+
+    def __exit__(self, *_):
+        print()
+        SilentPrinter.rewrite_last_printed = False
+
+    @staticmethod
+    def print(*args, **kwargs):
+        if SilentPrinter.rewrite_last_printed:
+            output = io.StringIO()
+            SilentPrinter.original_print(*args, file=output, end='', **kwargs)
+            contents = output.getvalue().replace('\n', '\t').replace('\t', ' ' * 4)[-100:]
+            output.close()
+            to_print = '\r' + ' ' * len(SilentPrinter.last_printed) + '\r' + contents
+            SilentPrinter.original_print(to_print, end='')
+            SilentPrinter.last_printed = contents
+        else:
+            SilentPrinter.original_print(*args, **kwargs)
+            SilentPrinter.last_printed = ''
+
+
+SilentPrinter.original_print = print
+print = SilentPrinter.print
 
 
 def analyze_results(results, precision=6):
@@ -28,12 +110,12 @@ def analyze_results(results, precision=6):
     with printoptions(suppress=True):
         print(f'\tResult : {results[-1]}')
         print(f'\tRounded: {rounded[-1]}')
+    return rounded[-1]
 
 
-def upward_force():
+def upward_force(elements_count: int = 10, la: float = 1):
     percent_steps = 10
     total_length = 10
-    elements_count = 10
     each_length = total_length / elements_count
     start_s_values = linspace(0, total_length, elements_count + 1)[:-1]
     EI = 1
@@ -49,8 +131,6 @@ def upward_force():
         EI=EI,
         GJ=GJ,
     ) for s in start_s_values]
-
-    la = 1
 
     results = []
 
@@ -69,16 +149,19 @@ def upward_force():
         task(),
         elements,
         params=Params(
+            use_threshold=global_params.use_threshold,
+            arm_position=global_params.arm_position,
             percent_steps=percent_steps,
             criteria_goal=0.001,
             criteria_final_goal=0.0000001,
             threshold_goal=0.01,
         ),
+        record_stats=global_params.interactive,
     )
 
     # noinspection PyArgumentEqualDefault
     visual = Plotter(
-        initial_system, INTERACTIVE,
+        initial_system, global_params.interactive,
         pause=0.01,
         skip_plots=0,
         plot_elements_segments=30,
@@ -95,11 +178,10 @@ def upward_force():
         },
     )
     visual.run()
-    analyze_results(results)
+    return analyze_results(results)
 
 
-def Bathe():
-    elements_count = 10
+def Bathe(elements_count: int = 10, la: float = 7.2):
     angle = pi / 4
     r = 100
     each_length = angle * r / elements_count
@@ -115,7 +197,6 @@ def Bathe():
         EI=EI, GJ=GJ,
     ) for s in linspace(0, angle, elements_count + 1)[:-1]]
 
-    la = 7.2
     force = la * EI / r ** 2
 
     results = []
@@ -138,15 +219,18 @@ def Bathe():
         task(),
         elements,
         params=Params(
+            use_threshold=global_params.use_threshold,
+            arm_position=global_params.arm_position,
             criteria_goal=1e-7,
             criteria_final_goal=1e-7,
             threshold_goal=0.1,
         ),
+        record_stats=global_params.interactive,
     )
 
     # noinspection PyArgumentEqualDefault
     visual = Plotter(
-        initial_system, INTERACTIVE,
+        initial_system, global_params.interactive,
         pause=0.01,
         skip_plots=0,
         plot_elements_segments=30, plot_basis_vectors_len=0.5,
@@ -162,12 +246,11 @@ def Bathe():
         },
     )
     visual.run()
-    analyze_results(results)
+    return analyze_results(results)
 
 
-def Ibrahimbegovich_small(force: bool = False):
+def Ibrahimbegovich_small(elements_count: int = 10, la: float = 0):
     total_length = 10
-    elements_count = 10
 
     each_length = total_length / elements_count
     start_s_values = linspace(0, total_length, elements_count + 1)[:-1]
@@ -185,35 +268,38 @@ def Ibrahimbegovich_small(force: bool = False):
 
     def task():
         title = f'\t\t\t\t\t\tElements: {elements_count}\n\n\t\tDisplacement components under end moment'
-        if force:
+        if la != 0:
             title += ' and pert. force'
         print(title + '\n')
 
         system = yield
         while system.percent <= 100:
-            force_val = 0.001 if force else 0
-
             m0 = 2.5 * pi * vector([0, 0, 1])
-            f = force_val * vector([0, 0, 1])
+            f = la * vector([0, 0, 1])
             fp = system.get_last_point()
 
             offset = system.get_last_point() - initial_system.get_last_point()
             with printoptions(precision=10, suppress=True):
                 print(f'\tIteration {system.iteration:<5}', offset)
             results.append(offset)
+            if len(results) >= 2 and array_equal(round(results[-2], 8), round(results[-1], 8)):
+                break
             system = yield Task(m0, f, fp)
 
     initial_system = System(
         task(),
         elements,
         params=Params(
+            use_threshold=global_params.use_threshold,
+            arm_position=global_params.arm_position,
             threshold_goal=0.01,
         ),
+        record_stats=global_params.interactive,
     )
 
     # noinspection PyArgumentEqualDefault
     visual = Plotter(
-        initial_system, INTERACTIVE,
+        initial_system, global_params.interactive,
         pause=0.01,
         skip_plots=0,
         plot_elements_segments=30,
@@ -227,10 +313,10 @@ def Ibrahimbegovich_small(force: bool = False):
         },
     )
     visual.run()
-    # analyze_results(results)
+    return analyze_results(results)
 
 
-def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
+def Ibrahimbegovich_big(elements_count: int = 10, percent_steps: int = 1):
     total_length = 10
     each_length = total_length / elements_count
     start_s_values = linspace(0, total_length, elements_count + 1)[:-1]
@@ -248,8 +334,6 @@ def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
 
     mode_m = '>'
     mode_f = '>'
-
-    results = []
 
     def task():
         system = yield
@@ -286,7 +370,6 @@ def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
 
             _percent = system.percent
             print(f'{round(_percent, 5)}% load, iteration {system.iteration:<5} last point = {fp}')
-            results.append(fp)
             system = yield Task(m0, f, fp)
 
             c_begin = system.elements[0].point(0)
@@ -301,12 +384,14 @@ def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
         task(),
         elements,
         params=Params(
-            arm_position=0.5,
+            use_threshold=global_params.use_threshold,
+            arm_position=global_params.arm_position,
             percent_steps=percent_steps,
             criteria_goal=1e-7,
             criteria_final_goal=1e-7,
             threshold_goal=1.1,
         ),
+        record_stats=global_params.interactive,
     )
 
     data = dict()
@@ -318,7 +403,7 @@ def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
 
     # noinspection PyArgumentEqualDefault
     visual = Plotter(
-        initial_system, INTERACTIVE,
+        initial_system, global_params.interactive,
         pause=0.01,
         skip_plots=0,
         plot_elements_segments=max(1, int(30 * each_length)),
@@ -337,11 +422,11 @@ def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
         },
     )
     visual.run()
-    analyze_results(results)
 
     data = visual.states[-1].shared_data['Ibrahimbegovich_big']
 
     if mode_f != '0':
+        fn = f'out/Ibrahimbegovich_big/ap={global_params.arm_position}/ps={percent_steps}_ec={elements_count}'
         if percent_steps > 1 and len(data['displacements_p']) > 0:
             disp_final = data['displacements_p'][-1][2]
             displacements_p_z_i = [disp_final - d[2] for d in vector(data['displacements_p'])]
@@ -351,17 +436,27 @@ def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
                 'Free-end displacement component in the direction of applied force\n'
                 'Ibrahimbegovich style (shifted & flipped & only percent steps)')
             plt.margins(y=0)
-            plt.show()
+            if global_params.save_analytic_plots:
+                save_fig(fn + '_paper_style')
+            if global_params.show_analytic_plots:
+                plt.show()
+            plt.close()
 
         displacements_z = [d[2] for d in vector(data['displacements'])]
         plt.plot(displacements_z, range(len(displacements_z)))
         for mark in data['displacements_marks'][::10]:
             plt.axhline(mark, linestyle='--', alpha=0.5)
         plt.title('Free-end displacement component in the direction of applied force')
-        plt.show()
+        if global_params.save_analytic_plots:
+            save_fig(fn)
+        if global_params.show_analytic_plots:
+            plt.show()
+        plt.close()
+
+    return data['displacements_p']
 
 
-def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
+def ideal_helix(elements_count: int = 1, use_m0: bool = False, guess_needed_criteria: bool = False):
     a = 2
     h = 0.05
 
@@ -449,7 +544,7 @@ def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
                        f'\tмає бути:      {ideal_end}\n'
                        f'\tрізниця:       {got_end - ideal_end}\n'
                        f'\tнорма різниці: {norm(got_end - ideal_end)}\n')
-            results.append(got_end)
+            results.append(got_end - ideal_end)
 
             system = yield Task(m0, f, fp)
 
@@ -465,16 +560,19 @@ def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
         task(),
         elements,
         params=Params(
+            use_threshold=global_params.use_threshold,
+            arm_position=global_params.arm_position,
             **(criteria_guesses if guess_needed_criteria else dict()),
             criteria_goal=0.000001,
             criteria_final_goal=0.000001,
             threshold_goal=1.1,
         ),
+        record_stats=global_params.interactive,
     )
 
     # noinspection PyArgumentEqualDefault
     visual = Plotter(
-        initial_system, INTERACTIVE,
+        initial_system, global_params.interactive,
         pause=0.01,
         skip_plots=0,
         plot_elements_segments=max(1, int(30 * each_length)),
@@ -492,7 +590,7 @@ def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
         },
     )
     visual.run()
-    analyze_results(results)
+    return analyze_results(results)
 
 
 # noinspection PyArgumentEqualDefault
@@ -504,19 +602,61 @@ def main():
 3 - спіраль з прямої балки - ідеальний хелікс
 4 - вигинання прямої балки - спрощена задача Ібрахімбеговича
 5 - спіраль з прямої балки - сила, прикладена до краю - задача Ібрахімбеговича
+0 - змінити параметри
   - press Enter to exit
 > ''')
         if not test:
             break
 
-        if test == '1':
-            upward_force()
+        ELEMENTS = [3, 10, 30, 100, 300, 1000]
+
+        if test == '0':
+            global_params.pick()
+        elif test == '1':
+            if global_params.batch:
+                for la in [1, 3, 10]:
+                    print(f'\nUpward force, λ = {la}')
+                    for elements_count in ELEMENTS:
+                        with SilentPrinter():
+                            result = upward_force(elements_count, la)
+                        with printoptions(suppress=True):
+                            print(f'{elements_count:<4} elements: {result}')
+            else:
+                elements_count = int(input('Elements count? (int): '))
+                la = float(input('λ? (float): '))
+                upward_force(elements_count, la)
 
         elif test == '2':
-            Bathe()
+            if global_params.batch:
+                for la, av, bv in [(0, point([29.3, 70.7, 0.0]), point([29.3, 70.7, 0.0])),
+                                   (3.6, point([22.2, 58.8, 40.2]), point([22.5, 59.2, 39.5])),
+                                   (7.2, point([15.6, 47.1, 53.6]), point([15.9, 47.2, 53.4]))]:
+                    print(f'\nBathe, λ = {la}')
+                    for elements_count in ELEMENTS:
+                        with SilentPrinter():
+                            result = Bathe(elements_count, la)
+                        with printoptions(suppress=True):
+                            print(f'{elements_count:<4} elements: '
+                                  f'{result},'
+                                  f'\tdiff_albino: {norm(result - av):.3},'
+                                  f'\tdiff_bathe: {norm(result - bv):.3}')
+            else:
+                elements_count = int(input('Elements count? (int): '))
+                la = float(input('λ? (float): '))
+                Bathe(elements_count, la)
 
         elif test == '3':
-            variant = input('''
+            if global_params.batch:
+                for use_m0 in [False, True]:
+                    for guess_needed_criteria in [False, True]:
+                        print(f'\nideal helix, use_m0 = {use_m0}, guess_needed_criteria = {guess_needed_criteria}')
+                        for elements_count in ELEMENTS:
+                            with SilentPrinter():
+                                result = ideal_helix(elements_count, use_m0, guess_needed_criteria)
+                            with printoptions(suppress=True):
+                                print(f'{elements_count:<4} elements: {result}')
+            else:
+                variant = input('''
 1   - один елемент
 1*  - один елемент, m0
 2   - 20 елементів
@@ -527,36 +667,56 @@ i2  - 20 елементів       1 ітерація
 i2* - 20 елементів, m0   1 ітерація
   - press Enter to go back
 > ''')
-            if variant == '1':
-                ideal_helix(elements_count=1)
-            elif variant == '1*':
-                ideal_helix(elements_count=1, use_m0=True)
-            elif variant == '2':
-                ideal_helix(elements_count=20)
-            elif variant == '2*':
-                ideal_helix(elements_count=20, use_m0=True)
-            elif variant == 'i1':
-                ideal_helix(elements_count=1, guess_needed_criteria=True)
-            elif variant == 'i1*':
-                ideal_helix(elements_count=1, use_m0=True, guess_needed_criteria=True)
-            elif variant == 'i2':
-                ideal_helix(elements_count=20, guess_needed_criteria=True)
-            elif variant == 'i2*':
-                ideal_helix(elements_count=20, use_m0=True, guess_needed_criteria=True)
+                if variant == '1':
+                    ideal_helix(elements_count=1)
+                elif variant == '1*':
+                    ideal_helix(elements_count=1, use_m0=True)
+                elif variant == '2':
+                    ideal_helix(elements_count=20)
+                elif variant == '2*':
+                    ideal_helix(elements_count=20, use_m0=True)
+                elif variant == 'i1':
+                    ideal_helix(elements_count=1, guess_needed_criteria=True)
+                elif variant == 'i1*':
+                    ideal_helix(elements_count=1, use_m0=True, guess_needed_criteria=True)
+                elif variant == 'i2':
+                    ideal_helix(elements_count=20, guess_needed_criteria=True)
+                elif variant == 'i2*':
+                    ideal_helix(elements_count=20, use_m0=True, guess_needed_criteria=True)
 
         elif test == '4':
-            variant = input('''
+            if global_params.batch:
+                for la in [0, 0.001]:
+                    print(f'\nIbrahimbegovich small, λ = {la}')
+                    for elements_count in ELEMENTS:
+                        with SilentPrinter():
+                            result = Ibrahimbegovich_small(elements_count, la)
+                        with printoptions(suppress=True):
+                            print(f'{elements_count:<4} elements: {result}')
+            else:
+                variant = input('''
 1 - без сили
 2 - мала сила
   - press Enter to go back
 > ''')
-            if variant == '1':
-                Ibrahimbegovich_small()
-            elif variant == '2':
-                Ibrahimbegovich_small(force=True)
+                if variant == '1':
+                    Ibrahimbegovich_small(elements_count=10, la=0)
+                elif variant == '2':
+                    Ibrahimbegovich_small(elements_count=10, la=0.001)
 
         elif test == '5':
-            variant = input('''
+            if global_params.batch:
+                for percent_steps in [1, 10, 100, 1000]:
+                    print(f'\nIbrahimbegovich big, percent_steps = {percent_steps}')
+                    for elements_count in ELEMENTS:
+                        with SilentPrinter():
+                            result = Ibrahimbegovich_big(elements_count, percent_steps)
+                        with printoptions(suppress=True):
+                            print(f'{elements_count:<4} elements')
+                            for i, r in enumerate(result):
+                                print(f'\t{i / (len(result) - 1):<6.1%}:\t{r}')
+            else:
+                variant = input('''
 1  - 1 крок         10  елементів
 2  - 10 кроків      10  елементів
 3  - 100 кроків     10  елементів
@@ -567,22 +727,22 @@ i2* - 20 елементів, m0   1 ітерація
 4* - 1000 кроків    100 елементів
   - press Enter to go back
 > ''')
-            if variant == '1':
-                Ibrahimbegovich_big(percent_steps=1)
-            elif variant == '2':
-                Ibrahimbegovich_big(percent_steps=10)
-            elif variant == '3':
-                Ibrahimbegovich_big(percent_steps=100)
-            elif variant == '4':
-                Ibrahimbegovich_big(percent_steps=1000)
-            elif variant == '1*':
-                Ibrahimbegovich_big(percent_steps=1, elements_count=100)
-            elif variant == '2*':
-                Ibrahimbegovich_big(percent_steps=10, elements_count=100)
-            elif variant == '3*':
-                Ibrahimbegovich_big(percent_steps=100, elements_count=100)
-            elif variant == '4*':
-                Ibrahimbegovich_big(percent_steps=1000, elements_count=100)
+                if variant == '1':
+                    Ibrahimbegovich_big(elements_count=10, percent_steps=1)
+                elif variant == '2':
+                    Ibrahimbegovich_big(elements_count=10, percent_steps=10)
+                elif variant == '3':
+                    Ibrahimbegovich_big(elements_count=10, percent_steps=100)
+                elif variant == '4':
+                    Ibrahimbegovich_big(elements_count=10, percent_steps=1000)
+                elif variant == '1*':
+                    Ibrahimbegovich_big(elements_count=100, percent_steps=1)
+                elif variant == '2*':
+                    Ibrahimbegovich_big(elements_count=100, percent_steps=10)
+                elif variant == '3*':
+                    Ibrahimbegovich_big(elements_count=100, percent_steps=100)
+                elif variant == '4*':
+                    Ibrahimbegovich_big(elements_count=100, percent_steps=1000)
 
 
 if __name__ == '__main__':

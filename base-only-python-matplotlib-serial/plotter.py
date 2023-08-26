@@ -481,5 +481,8 @@ class Plotter:
             while not self._current_state.is_finished():
                 new = self._current_state.step()
                 if new is not None:
-                    self.states.append(new)
-                    self.current_state_num += 1
+                    if self.interactive:
+                        self.states.append(new)
+                        self.current_state_num += 1
+                    else:
+                        self.states[self.current_state_num] = new

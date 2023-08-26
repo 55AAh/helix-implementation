@@ -19,11 +19,9 @@ from plotter import ISystem, DrawParams
 #     pass
 
 
-USE_THRESHOLD = False
-
-
 @dataclass
 class Params:
+    use_threshold: bool = False
     arm_position: float = 0
     percent_steps: int = 1
     criteria_goal: float = 1e-12
@@ -180,7 +178,8 @@ class System(ISystem):
 
     def __init__(self, task_gen: Generator[Task, 'System', None],
                  elements: List[Element], params: Params, shared_data: dict = None,
-                 builtin_moments: Optional[List[vector]] = None):
+                 builtin_moments: Optional[List[vector]] = None,
+                 record_stats: bool = True):
         """ Створює систему елементів
 
          :param elements: набір елементів
@@ -192,6 +191,7 @@ class System(ISystem):
         if shared_data is None:
             shared_data = dict()
         self.shared_data = shared_data
+        self.record_stats = record_stats
 
         self.current_task = None
         self.applying_to_num = None
@@ -215,7 +215,8 @@ class System(ISystem):
                        self.elements,
                        params=self.params,
                        shared_data=self.shared_data,
-                       builtin_moments=self.builtin_moments)
+                       builtin_moments=self.builtin_moments,
+                       record_stats=self.record_stats)
         return clone
 
     def get_last_point(self, guess: bool = False) -> point:
@@ -326,7 +327,7 @@ class System(ISystem):
             try:
                 self.current_task = self.task_gen.send(self)
             except StopIteration:
-                print('StopIteration')
+                # print('StopIteration')
                 self.state = States.Finished
                 return
             self.state = States.SolvingTask
@@ -394,12 +395,14 @@ class System(ISystem):
             ]
             self.max_criteria = max(criteria)
 
-            if self.max_criteria >= (self.threshold if USE_THRESHOLD else 1):
+            tr = self.threshold if self.params.use_threshold else 1
+            if self.max_criteria >= tr:
                 self.state = States.SatisfyingCriteria
                 return
 
             goal = self.params.criteria_goal if self.percent < 100 else self.params.criteria_final_goal
-            if self.max_criteria < goal and (not USE_THRESHOLD or self.threshold < self.params.threshold_goal):
+            tr_met = not self.params.use_threshold or self.threshold < self.params.threshold_goal
+            if self.max_criteria < goal and tr_met:
                 self.state = States.SolvedTask
                 return
 
@@ -417,7 +420,8 @@ class System(ISystem):
                 log10_ratio = log10(self.ratio)
                 log10_criteria = log10(self.max_criteria)
                 log10_threshold = log10(self.threshold)
-                Stats(self.shared_data).add(cosine, C_cos, mu, log10_ratio, log10_criteria, log10_threshold)
+                if self.record_stats:
+                    Stats(self.shared_data).add(cosine, C_cos, mu, log10_ratio, log10_criteria, log10_threshold)
                 # dprint(f'cosine: {cosine:.3g}\t'
                 #        f'C_cos: {C_cos:.3g}\t'
                 #        f'mu: {mu:.3g}\t'
@@ -433,7 +437,7 @@ class System(ISystem):
                 new_threshold = self.threshold
 
             new_state = System(self.task_gen, self.guess, params=self.params, shared_data=self.shared_data,
-                               builtin_moments=self.applied_moments)
+                               builtin_moments=self.applied_moments, record_stats=self.record_stats)
             new_state.last_point_diff_prev = last_point_diff
             new_state.percent = self.percent
             new_state.iteration = self.iteration + 1
@@ -444,7 +448,8 @@ class System(ISystem):
             return new_state
 
         if self.state == States.SatisfyingCriteria:
-            self.ratio /= (self.max_criteria / (self.threshold if USE_THRESHOLD else 1) * 1.01)
+            tr = self.threshold if self.params.use_threshold else 1
+            self.ratio /= (self.max_criteria / tr * 1.01)
             self.state = States.SolvingTask
             return
 
@@ -480,7 +485,7 @@ class System(ISystem):
             return
 
         new_state = System(self.task_gen, self.guess, params=self.params, shared_data=self.shared_data,
-                           builtin_moments=self.builtin_moments)
+                           builtin_moments=self.builtin_moments, record_stats=self.record_stats)
         return new_state
 
     def get_state_text(self) -> str:
@@ -539,7 +544,7 @@ class System(ISystem):
         np_des = lambda a: array(a) if a is not None else None
         np_list_des = lambda l: [np_des(a) for a in l] if l is not None else None
 
-        system = System(self.task_gen, elements=[], params=obj_des(Params, d['params']))
+        system = System(self.task_gen, elements=[], params=obj_des(Params, d['params']), record_stats=False)
         system.state = States[d['state']]
 
         system.current_task = obj_des(Task, d['current_task'])
