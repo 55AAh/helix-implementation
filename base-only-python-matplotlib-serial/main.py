@@ -3,6 +3,7 @@ from numpy import array as point
 from numpy import array as vector, pi, sqrt, cos, sin, cross, printoptions
 from numpy import dot
 from numpy import linspace
+from numpy import round, array_equal
 from numpy.linalg import norm
 
 from element import Element
@@ -13,6 +14,17 @@ from system import System, Params, Task
 def dprint(*_args, **_kwargs):
     print(*_args, **_kwargs)
     pass
+
+
+def analyze_results(results, precision=6):
+    rounded = [round(p, precision) for p in results]
+    while len(rounded) > 2 and array_equal(rounded[-2], rounded[-1]):
+        del rounded[-1]
+        del results[-1]
+    print(f'\n\n\tTotal iterations: {len(rounded)}')
+    with printoptions(suppress=True):
+        print(f'\tResult : {results[-1]}')
+        print(f'\tRounded: {rounded[-1]}')
 
 
 def upward_force():
@@ -37,6 +49,8 @@ def upward_force():
 
     la = 1
 
+    results = []
+
     def task():
         system = yield
         while system.percent <= 100:
@@ -45,6 +59,7 @@ def upward_force():
             f = task_mult * la * vector([0, 0, 1])
             fp = system.get_last_point()
             print(f'{system.percent}% load, iteration {system.iteration}:\tlast point = {fp}')
+            results.append(fp)
             system = yield Task(m0, f, fp)
 
     initial_system = System(
@@ -77,6 +92,7 @@ def upward_force():
         },
     )
     visual.show_interactive()
+    analyze_results(results)
 
 
 def Bathe():
@@ -99,6 +115,8 @@ def Bathe():
     la = 7.2
     force = la * EI / r ** 2
 
+    results = []
+
     def task():
         system = yield
         while system.percent <= 100:
@@ -107,6 +125,9 @@ def Bathe():
             fp = system.get_last_point()
             with printoptions(precision=10, suppress=True):
                 print(f'Ітерація {system.iteration}, остання точка = {fp}')
+            results.append(fp)
+            if len(results) >= 2 and array_equal(round(results[-2], 8), round(results[-1], 8)):
+                break
             system = yield Task(m0, f, fp)
         yield
 
@@ -138,6 +159,7 @@ def Bathe():
         },
     )
     visual.show_interactive()
+    analyze_results(results)
 
 
 def Ibrahimbegovich_small(force: bool = False):
@@ -156,6 +178,8 @@ def Ibrahimbegovich_small(force: bool = False):
         EI=100, GJ=100,
     ) for s in start_s_values]
 
+    results = []
+
     def task():
         title = f'\t\t\t\t\t\tElements: {elements_count}\n\n\t\tDisplacement components under end moment'
         if force:
@@ -170,11 +194,10 @@ def Ibrahimbegovich_small(force: bool = False):
             f = force_val * vector([0, 0, 1])
             fp = system.get_last_point()
 
+            offset = system.get_last_point() - initial_system.get_last_point()
             with printoptions(precision=10, suppress=True):
-                print(f'\tIteration {system.iteration:<5}',
-                      system.get_last_point() -
-                      initial_system.get_last_point())
-
+                print(f'\tIteration {system.iteration:<5}', offset)
+            results.append(offset)
             system = yield Task(m0, f, fp)
 
     initial_system = System(
@@ -201,6 +224,7 @@ def Ibrahimbegovich_small(force: bool = False):
         },
     )
     visual.show_interactive()
+    analyze_results(results)
 
 
 def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
@@ -221,6 +245,8 @@ def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
 
     mode_m = '>'
     mode_f = '>'
+
+    results = []
 
     def task():
         system = yield
@@ -257,6 +283,7 @@ def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
 
             _percent = system.percent
             print(f'{round(_percent, 5)}% load, iteration {system.iteration:<5} last point = {fp}')
+            results.append(fp)
             system = yield Task(m0, f, fp)
 
             c_begin = system.elements[0].point(0)
@@ -307,6 +334,7 @@ def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
         },
     )
     visual.show_interactive()
+    analyze_results(results)
 
     data = visual.states[-1].shared_data['Ibrahimbegovich_big']
 
@@ -405,6 +433,8 @@ def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
     _T = dot(_mm, ideal_ts[0]) / GJ
     _last_point_diff_ratio = a / ah_sr
 
+    results = []
+
     def task():
         system = yield
         while system.percent <= 100:
@@ -416,6 +446,7 @@ def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
                        f'\tмає бути:      {ideal_end}\n'
                        f'\tрізниця:       {got_end - ideal_end}\n'
                        f'\tнорма різниці: {norm(got_end - ideal_end)}\n')
+            results.append(got_end)
 
             system = yield Task(m0, f, fp)
 
@@ -458,6 +489,7 @@ def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
         },
     )
     visual.show_interactive()
+    analyze_results(results)
 
 
 # noinspection PyArgumentEqualDefault
