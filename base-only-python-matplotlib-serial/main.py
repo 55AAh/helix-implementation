@@ -11,6 +11,9 @@ from plotter import Plotter
 from system import System, Params, Task
 
 
+INTERACTIVE = input('Interactive ? (y/n): ') == 'y'
+
+
 def dprint(*_args, **_kwargs):
     print(*_args, **_kwargs)
     pass
@@ -75,7 +78,7 @@ def upward_force():
 
     # noinspection PyArgumentEqualDefault
     visual = Plotter(
-        initial_system,
+        initial_system, INTERACTIVE,
         pause=0.01,
         skip_plots=0,
         plot_elements_segments=30,
@@ -91,7 +94,7 @@ def upward_force():
             'la': la,
         },
     )
-    visual.show_interactive()
+    visual.run()
     analyze_results(results)
 
 
@@ -143,7 +146,7 @@ def Bathe():
 
     # noinspection PyArgumentEqualDefault
     visual = Plotter(
-        initial_system,
+        initial_system, INTERACTIVE,
         pause=0.01,
         skip_plots=0,
         plot_elements_segments=30, plot_basis_vectors_len=0.5,
@@ -158,7 +161,7 @@ def Bathe():
             'la': la,
         },
     )
-    visual.show_interactive()
+    visual.run()
     analyze_results(results)
 
 
@@ -210,7 +213,7 @@ def Ibrahimbegovich_small(force: bool = False):
 
     # noinspection PyArgumentEqualDefault
     visual = Plotter(
-        initial_system,
+        initial_system, INTERACTIVE,
         pause=0.01,
         skip_plots=0,
         plot_elements_segments=30,
@@ -223,8 +226,8 @@ def Ibrahimbegovich_small(force: bool = False):
             'total_length': total_length,
         },
     )
-    visual.show_interactive()
-    analyze_results(results)
+    visual.run()
+    # analyze_results(results)
 
 
 def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
@@ -315,7 +318,7 @@ def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
 
     # noinspection PyArgumentEqualDefault
     visual = Plotter(
-        initial_system,
+        initial_system, INTERACTIVE,
         pause=0.01,
         skip_plots=0,
         plot_elements_segments=max(1, int(30 * each_length)),
@@ -333,7 +336,7 @@ def Ibrahimbegovich_big(percent_steps=1, elements_count=10):
             'EI': EI, 'GJ': GJ,
         },
     )
-    visual.show_interactive()
+    visual.run()
     analyze_results(results)
 
     data = visual.states[-1].shared_data['Ibrahimbegovich_big']
@@ -471,7 +474,7 @@ def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
 
     # noinspection PyArgumentEqualDefault
     visual = Plotter(
-        initial_system,
+        initial_system, INTERACTIVE,
         pause=0.01,
         skip_plots=0,
         plot_elements_segments=max(1, int(30 * each_length)),
@@ -488,7 +491,7 @@ def ideal_helix(elements_count=1, use_m0=False, guess_needed_criteria=False):
             'winds': winds,
         },
     )
-    visual.show_interactive()
+    visual.run()
     analyze_results(results)
 
 

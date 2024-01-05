@@ -90,30 +90,34 @@ class ISystem(ABC):
 
 
 class Plotter:
-    def __init__(self, system: ISystem, pause: float = 0, skip_plots: int = 0,
+    def __init__(self, system: ISystem, interactive: bool = True,
+                 pause: float = 0, skip_plots: int = 0,
                  plot_elements_segments: int = 30,
                  plot_basis_vectors_len: float = 1, plot_basis_vectors_segments: int = 1,
                  next_cnt: int = 1, keep_lims: bool = False, lims=None,
                  major: dict = None, minor: dict = None):
-        self.fig: Figure = plt.figure()
-        self.ax: Axes = self.fig.add_subplot(projection='3d')
 
         self.states = [system]
         self.current_state_num = 0
-        self.element_params = DrawParams()
-        self.guess_params = DrawParams()
-        self.guess_params.line = False
-        self._widgets: List[AxesWidget] = []
-        self.state_text: Optional[Text] = None
-        self._plots_skipped = 0
-        self._next_cnt = next_cnt
-        self._keep_lims = keep_lims
-        self._pause = pause
-        self._skip_plots = skip_plots
-        self._plot_elements_segments = plot_elements_segments
-        self._plot_basis_vectors_len = plot_basis_vectors_len
-        self._plot_basis_vectors_segments = plot_basis_vectors_segments
-        self._lims = lims
+
+        self.interactive = interactive
+        if self.interactive:
+            self.fig: Figure = plt.figure()
+            self.ax: Axes = self.fig.add_subplot(projection='3d')
+            self.element_params = DrawParams()
+            self.guess_params = DrawParams()
+            self.guess_params.line = False
+            self._widgets: List[AxesWidget] = []
+            self.state_text: Optional[Text] = None
+            self._plots_skipped = 0
+            self._next_cnt = next_cnt
+            self._keep_lims = keep_lims
+            self._pause = pause
+            self._skip_plots = skip_plots
+            self._plot_elements_segments = plot_elements_segments
+            self._plot_basis_vectors_len = plot_basis_vectors_len
+            self._plot_basis_vectors_segments = plot_basis_vectors_segments
+            self._lims = lims
 
         self._major = major
 
@@ -166,7 +170,10 @@ class Plotter:
 
         return cb
 
-    def show_interactive(self):
+    def run_interactive(self):
+        if not self.interactive:
+            return self.run()
+
         self.fig.subplots_adjust(bottom=0.32)
 
         self._plot()
@@ -466,3 +473,13 @@ class Plotter:
         _make_step()
         self._plot()
         plt.show(block=True)
+
+    def run(self):
+        if self.interactive:
+            self.run_interactive()
+        else:
+            while not self._current_state.is_finished():
+                new = self._current_state.step()
+                if new is not None:
+                    self.states.append(new)
+                    self.current_state_num += 1
